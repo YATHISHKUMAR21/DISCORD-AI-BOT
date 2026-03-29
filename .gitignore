@@ -1,0 +1,13 @@
+node_modeule/
+dist/
+build/
+.DS_Store
+*.log
+*.env
+*.cache
+*.tmp
+*.bak
+*.swp
+*.swo
+*.zip
+*.tar.gz   
