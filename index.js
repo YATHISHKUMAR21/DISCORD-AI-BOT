@@ -1,71 +1,75 @@
-const {Client, GatewayIntentBits, AttachmentBuilder } = require("discord.js");
-const {GoogleGenAi} = require("@google/genai");
-
+const { Client, GatewayIntentBits, AttachmentBuilder } = require("discord.js");
+const { GoogleGenAi } = require("@google/genai");
 require("dotenv").config();
 
-
+const token = process.env.DISCORD_BOT_TOKEN;
+if (!token) {
+    console.error(
+        "Missing DISCORD_BOT_TOKEN in environment. Add it to a .env file or your environment variables."
+    );
+    process.exit(1);
+}
 
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent
-    ]
+        GatewayIntentBits.MessageContent,
+    ],
 });
 
 const ai = new GoogleGenAi({
-    apiKey: process.env.GOOGLE_GENAI_API_KEY
+    apiKey: process.env.GOOGLE_GENAI_API_KEY,
 });
 
 async function generateImage(prompt) {
     try {
-
-    //     const prompt =
-    // "Create a picture of a nano banana dish in a fancy restaurant with a Gemini theme";
-
-
+        if (!prompt) return null;
         const response = await ai.generateContent({
-             model: "gemini-3.1-flash-image-preview",
-             contents : prompt
-        })
-    for (const part of response.candidates[0].content.parts) {
-    if (part.text) {
-      console.log(part.text);
-    } else if (part.inlineData) {
-      const imageData = part.inlineData.data;
-      const buffer = Buffer.from(imageData, "base64");
-     return buffer;
+            model: "gemini-3.1-flash-image-preview",
+            contents: prompt,
+        });
+        const parts = response?.candidates?.[0]?.content?.parts;
+        if (!parts) return null;
+        for (const part of parts) {
+            if (part.inlineData && part.inlineData.data) {
+                const imageData = part.inlineData.data;
+                return Buffer.from(imageData, "base64");
+            } else if (part.text) {
+                console.log(part.text);
+            }
+        }
+        return null;
+    } catch (err) {
+        console.error("generateImage error:", err);
+        return null;
     }
-  }
 }
 
-
 client.once("ready", () => {
-    console.log("Bot is ready!");
+    console.log(`Bot is ready: ${client.user?.tag ?? "<unknown>"}`);
 });
 
-client.on("messageCreate", async(message) => {
-    // console.log(`Received message: ${message.content}`);
-    // console.log(message.member.user);
-    // const attachements = message
-    const isBot = message.author.bot;
-    if (isBot) {
-        return;
+client.on("messageCreate", async (message) => {
+    try {
+        if (message.author?.bot) return;
+        const imageBuffer = await generateImage(message.content);
+        if (imageBuffer) {
+            const attachment = new AttachmentBuilder(imageBuffer, {
+                name: "generated_image.png",
+            });
+            await message.channel.send({ files: [attachment] });
+        }
+    } catch (err) {
+        console.error("messageCreate handler error:", err);
     }
-    const imageBuffer = await generateImage(message.content);
-   if(imageBuffer) {
-
-    const attachment = new AttachmentBuilder(imageBuffer, { name: "generated_image.png" });
-    message.channel.send({ files: [attachment] });
-
-
-    // message.reply(`Hello ${message.author.username}! I am a yathish bot.`);
-
-
-    // message.reply("Hello! I am a yathish bot.");
-    // if (message.content === "ping") {
-    //     message.reply("pong");
-    // }
 });
 
-client.login(process.env.DISCORD_BOT_TOKEN);
+client.on("error", (e) => console.error("Discord client error:", e));
+client.on("warn", (w) => console.warn("Discord client warning:", w));
+process.on("unhandledRejection", (r) => console.error("Unhandled Rejection:", r));
+
+client.login(token).catch((err) => {
+    console.error("Login failed:", err);
+    process.exit(1);
+});
