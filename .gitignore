@@ -10,4 +10,17 @@ build/
 *.swp
 *.swo
 *.zip
+*.tar.gz
+./node_modules/
+dist/
+build/
+.DS_Store
+*.log
+*.env
+*.cache
+*.tmp
+*.bak
+*.swp
+*.swo
+*.zip
 *.tar.gz   
